@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  system_admin
+  company_admin
+  company_user
+}
+
+enum ConsentStatus {
+  unknown
+  granted
+  revoked
+}
+
+enum ParsedStatus {
+  pending
+  parsed
+  failed
+}
+
+enum ViolationStatus {
+  pending_match
+  matched
+  notified
+  failed
+}
+
+enum MessageStatus {
+  queued
+  sending
+  sent
+  failed
+}
+
+model Company {
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String   @unique
+  contact_email      String?
+  contact_phone      String?
+  whatsapp_sender_id String?
+  settings_json      Json?
+
+  users       User[]
+  drivers     Driver[]
+  emails      InboundEmail[]
+  violations  Violation[]
+  messages    WhatsAppMessage[]
+  auditLogs   AuditLog[]
+
+  @@index([slug])
+}
+
+model User {
+  id            String   @id @default(cuid())
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+  email         String   @unique
+  password_hash String
+  role          Role
+  status        String   @default("active")
+
+  auditLogs     AuditLog[]
+}
+
+model Driver {
+  id                 String         @id @default(cuid())
+  company_id         String
+  company            Company        @relation(fields: [company_id], references: [id])
+  external_driver_id String
+  name               String
+  whatsapp_e164      String
+  vehicle_number     String?
+  consent_status     ConsentStatus  @default(unknown)
+  consent_at         DateTime?
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  violations         Violation[]
+  messages           WhatsAppMessage[]
+
+  @@unique([company_id, external_driver_id])
+  @@index([company_id, whatsapp_e164])
+  @@index([createdAt]) // optional
+}
+
+model InboundEmail {
+  id            String   @id @default(cuid())
+  company_id    String
+  company       Company  @relation(fields: [company_id], references: [id])
+  message_id    String
+  mail_from     String
+  rcpt_to       String
+  subject       String?
+  received_at   DateTime @default(now())
+  s3_key        String
+  parsed_status ParsedStatus @default(pending)
+  dedup_hash    String
+
+  @@unique([company_id, message_id])
+  @@index([company_id, dedup_hash])
+}
+
+model Violation {
+  id               String   @id @default(cuid())
+  company_id       String
+  company          Company  @relation(fields: [company_id], references: [id])
+  driver_id        String?
+  driver           Driver?  @relation(fields: [driver_id], references: [id])
+  violation_type   String?
+  occurred_at      DateTime?
+  location         String?
+  raw_payload_ref  String?
+  source_email_id  String?
+  status           ViolationStatus @default(pending_match)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  messages         WhatsAppMessage[]
+
+  @@index([company_id, status, occurred_at])
+}
+
+model WhatsAppMessage {
+  id                  String   @id @default(cuid())
+  company_id          String
+  company             Company  @relation(fields: [company_id], references: [id])
+  driver_id           String?
+  driver              Driver?  @relation(fields: [driver_id], references: [id])
+  violation_id        String?
+  violation           Violation? @relation(fields: [violation_id], references: [id])
+  template_name       String
+  payload_json        Json
+  provider_message_id String?
+  status              MessageStatus @default(queued)
+  sent_at             DateTime?
+  error               String?
+
+  created_at          DateTime @default(now())
+
+  @@index([company_id, status, sent_at])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  actor_user_id  String?
+  actor          User?    @relation(fields: [actor_user_id], references: [id])
+  company_id     String?
+  company        Company? @relation(fields: [company_id], references: [id])
+  action         String
+  resource_type  String
+  resource_id    String?
+  at             DateTime @default(now())
+
+  @@index([company_id, at])
+}
