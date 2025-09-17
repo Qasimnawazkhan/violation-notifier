@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 
 declare global {
-  // Allow global prisma caching in dev without re-declare warnings
+  // In dev with Next.js (hot reload), reuse a single client
   // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined
 }
