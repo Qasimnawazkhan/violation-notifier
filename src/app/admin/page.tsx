@@ -242,7 +242,7 @@ export default async function AdminPage({
           <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 18 }}>
             Register Company
           </h2>
-          <RegisterCompanyForm loading={false}
+          <RegisterCompanyForm
           />
         </section>
       </div>

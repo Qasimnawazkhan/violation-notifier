@@ -6,3 +6,15 @@
 html, body {
   min-height: 100%;
 }
+
+/* Example: Add a background color for the whole app */
+body {
+  background-color: #f9fafb;
+}
+
+/* Example: Custom font */
+body {
+  font-family: 'Inter', 'Arial', sans-serif;
+}
+
+/* You can add more custom styles below as needed */

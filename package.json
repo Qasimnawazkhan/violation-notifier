@@ -38,6 +38,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
     "@types/bcryptjs": "^2.4.2",
+    "@types/css-modules": "^1.0.5",
     "@types/express": "^5.0.3",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^20.11.30",
@@ -52,7 +53,7 @@
     "jsdom": "^24.0.0",
     "postcss": "^8.5.6",
     "prisma": "^6.16.2",
-    "tailwindcss": "^3.4.17",
+    "tailwindcss": "^3.4.18",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
