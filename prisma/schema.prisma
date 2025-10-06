@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  system_admin
+  company_admin
+  company_user
+}
+
+enum ConsentStatus {
+  unknown
+  granted
+  revoked
+}
+
+enum ParsedStatus {
+  pending
+  parsed
+  failed
+}
+
+enum ViolationStatus {
+  pending_match
+  matched
+  notified
+  failed
+}
+
+enum MessageStatus {
+  queued
+  sending
+  sent
+  failed
+}
+
+/**
+ * NEW: Enum for structured violation types.
+ * NOTE: Names chosen to match business vocabulary; adjust as needed.
+ */
+enum ViolationType {
+  OverSpeeding
+  SeatBelt
+  FollowingDistance
+  PhoneUse
+  SignalBreak
+  DocumentsMissing
+  Other
+}
+
+model Company {
+  id                 String  @id @default(cuid())
+  name               String
+  slug               String  @unique
+  contact_email      String? @unique
+  contact_phone      String?
+  whatsapp_sender_id String?
+
+  provider           String?   // gmail, outlook, yahoo, etc.
+  imap_user          String?   // IMAP login, usually email
+  imap_password      String?   // store encrypted!
+  imap_server        String?   // NEW: IMAP server address (e.g. imap.gmail.com)
+  imap_port          Int?      // NEW: IMAP port (usually 993)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  users            User[]
+  drivers          Driver[]
+  inboundEmails    InboundEmail[]
+  violations       Violation[]
+  whatsappMessages WhatsAppMessage[]
+  auditLogs        AuditLog[]
+
+  @@index([slug])
+  @@index([contact_email])
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  username      String?  @unique
+  password_hash String
+  role          Role
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  actedAuditLogs AuditLog[] @relation("AuditLogActor")
+}
+
+model Driver {
+  id                 String        @id @default(cuid())
+  company_id         String
+  company            Company       @relation(fields: [company_id], references: [id])
+  external_driver_id String
+  name               String
+  whatsapp_e164      String
+  vehicle_number     String?
+  consent_status     ConsentStatus @default(unknown)
+  consent_at         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  violations Violation[]
+  messages   WhatsAppMessage[]
+
+  @@unique([company_id, external_driver_id])
+  @@index([company_id, whatsapp_e164])
+  @@index([createdAt])
+}
+
+model InboundEmail {
+  id            String       @id @default(cuid())
+  company_id    String
+  company       Company      @relation(fields: [company_id], references: [id])
+  message_id    String
+  mail_from     String
+  rcpt_to       String
+  subject       String?
+  received_at   DateTime     @default(now())
+  s3_key        String
+  parsed_status ParsedStatus @default(pending)
+  dedup_hash    String
+
+  @@unique([company_id, message_id])
+  @@index([company_id, dedup_hash])
+}
+
+/**
+ * MERGED Violation MODEL
+ * - Structured enum violation_type (required, default Other)
+ * - Added source/source_ref/raw_excerpt for ingestion & dedupe
+ * - Preserved legacy fields (occurred_at, location, raw_payload_ref, source_email_id, status, updated_at)
+ * - driver_id is required here; make optional temporarily if you still have null driver rows to backfill.
+ */
+model Violation {
+  id         String  @id @default(cuid())
+  company_id String
+  company    Company @relation(fields: [company_id], references: [id])
+  driver_id  String
+  driver     Driver  @relation(fields: [driver_id], references: [id])
+
+  violation_type ViolationType @default(Other)
+
+  // Legacy / existing fields retained
+  occurred_at     DateTime?
+  location        String?
+  raw_payload_ref String?
+  source_email_id String?
+
+  // New ingestion & classification metadata
+  source      String? // e.g. 'email', 'manual', 'system'
+  source_ref  String? // message-id / hash for idempotency
+  raw_excerpt String? // small snippet for quick audit
+
+  status     ViolationStatus @default(pending_match)
+  created_at DateTime        @default(now())
+  updated_at DateTime        @updatedAt
+
+  messages WhatsAppMessage[]
+
+  // Idempotency: allows many NULL source_ref rows in Postgres, but unique when populated.
+  @@unique([company_id, driver_id, violation_type, source_ref])
+  // Indexes
+  @@index([company_id, status, occurred_at])
+  @@index([company_id])
+  @@index([driver_id])
+  @@index([company_id, driver_id])
+}
+
+model WhatsAppMessage {
+  id                  String        @id @default(cuid())
+  company_id          String
+  company             Company       @relation(fields: [company_id], references: [id])
+  driver_id           String?
+  driver              Driver?       @relation(fields: [driver_id], references: [id])
+  violation_id        String?
+  violation           Violation?    @relation(fields: [violation_id], references: [id])
+  template_name       String
+  payload_json        Json
+  provider_message_id String?
+  status              MessageStatus @default(queued)
+  sent_at             DateTime?
+  error               String?
+
+  created_at DateTime @default(now())
+
+  @@index([company_id, status, sent_at])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  actor_user_id String?
+  actor         User?   @relation("AuditLogActor", fields: [actor_user_id], references: [id])
+
+  company_id String?
+  company    Company? @relation(fields: [company_id], references: [id])
+
+  action        String
+  resource_type String
+  resource_id   String?
+  at            DateTime @default(now())
+
+  @@index([company_id, at])
+}
