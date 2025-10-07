@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "postinstall": "node ./scripts/fix-tsconfig-for-vercel.js",
     "lint": "eslint --ext .ts,.tsx .",
     "lint:fix": "eslint --ext .ts,.tsx . --fix",
     "lint:next": "next lint",
@@ -13,6 +14,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
+    
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",
