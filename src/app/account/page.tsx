@@ -3,11 +3,11 @@ import { authOptions } from '@/lib/nextauth'
 import { redirect } from 'next/navigation'
 import { updateCredentials } from './actions'
 
-type PageProps = {
+export default async function AccountPage({
+  searchParams,
+}: {
   searchParams?: Record<string, string | string[] | undefined>
-}
-
-export default async function AccountPage({ searchParams }: PageProps) {
+}) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
