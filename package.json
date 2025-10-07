@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --ext .ts,.tsx .",
-    "postinstall": "node ./scripts/fix-tsconfig-for-vercel.mjs",
     "lint:fix": "eslint --ext .ts,.tsx . --fix",
     "lint:next": "next lint",
     "seed": "tsx prisma/seed.ts",
